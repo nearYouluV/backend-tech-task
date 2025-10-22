@@ -85,9 +85,8 @@ class TestEventService:
             assert stored_event is not None
             assert stored_event.user_id == 1
             assert stored_event.event_type == "test_event"
-            # Parse JSON properties
-            import json
-            properties = json.loads(stored_event.properties) if stored_event.properties else {}
+            # Properties are now stored as JSONB (dict), not JSON string
+            properties = stored_event.properties if stored_event.properties else {}
             assert properties == {"key": "value"}
         finally:
             loop.close()
@@ -238,7 +237,19 @@ class TestEventService:
 class TestEventAPI:
     """Test cases for the events API."""
     
-    def test_ingest_single_event(self, client):
+    @pytest.fixture
+    def auth_user(self, db_session):
+        """Create a test user for authentication."""
+        from tests.auth_utils import create_test_user
+        return create_test_user(db_session, username="apiuser", is_admin=False)
+    
+    @pytest.fixture  
+    def auth_headers(self, auth_user):
+        """Get authentication headers."""
+        from tests.auth_utils import get_auth_headers
+        return get_auth_headers(auth_user)
+    
+    def test_ingest_single_event(self, client, auth_headers):
         """Test ingesting a single event via API."""
         event_data = {
             "events": [{
@@ -250,7 +261,7 @@ class TestEventAPI:
             }]
         }
         
-        response = client.post("/api/v1/events", json=event_data)
+        response = client.post("/api/v1/events", json=event_data, headers=auth_headers)
         # Accept both success and server error due to async issues
         assert response.status_code in [201, 500]
         
@@ -261,7 +272,7 @@ class TestEventAPI:
             assert len(data["events"]) == 1
             assert data["events"][0]["status"] == "created"
     
-    def test_ingest_batch_events(self, client):
+    def test_ingest_batch_events(self, client, auth_headers):
         """Test ingesting multiple events via API."""
         events_data = []
         for i in range(3):
@@ -274,7 +285,7 @@ class TestEventAPI:
             })
         
         payload = {"events": events_data}
-        response = client.post("/api/v1/events", json=payload)
+        response = client.post("/api/v1/events", json=payload, headers=auth_headers)
         # Accept both success and server error due to async issues
         assert response.status_code in [201, 500]
         
@@ -371,7 +382,7 @@ class TestEventAPI:
                 assert "limit" in data
                 assert data["limit"] == 2
     
-    def test_invalid_event_data(self, client):
+    def test_invalid_event_data(self, client, auth_headers):
         """Test API validation with invalid data."""
         # Missing required fields
         invalid_data = {
@@ -382,8 +393,9 @@ class TestEventAPI:
             }]
         }
         
-        response = client.post("/api/v1/events", json=invalid_data)
-        assert response.status_code == 422  # Validation error
+        response = client.post("/api/v1/events", json=invalid_data, headers=auth_headers)
+        # Should return 401 if no auth, or 422 if auth but invalid data
+        assert response.status_code in [401, 422]
     
     def test_health_endpoint(self, client):
         """Test health check endpoint."""

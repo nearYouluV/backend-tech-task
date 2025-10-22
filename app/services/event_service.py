@@ -3,7 +3,7 @@ Event service for handling event ingestion and retrieval.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Tuple, Union, Optional
 from uuid import UUID
 
@@ -56,12 +56,15 @@ class EventService:
                     )
                 else:
                     # Create new event
+                    # Convert timezone-aware to timezone-naive for PostgreSQL
+                    occurred_at_naive = event_data.occurred_at.replace(tzinfo=None) if event_data.occurred_at.tzinfo else event_data.occurred_at
+                    
                     db_event = Event(
                         event_id=event_data.event_id,
-                        occurred_at=event_data.occurred_at,
+                        occurred_at=occurred_at_naive,
                         user_id=event_data.user_id,
                         event_type=event_data.event_type,
-                        properties=json.dumps(event_data.properties),
+                        properties=event_data.properties,  # Use dict directly for JSONB
                         created_at=datetime.now()
                     )
                     

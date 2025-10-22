@@ -2,7 +2,7 @@
 Analytics service for generating statistics and reports.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 from sqlalchemy import and_, func, distinct, select
@@ -23,7 +23,7 @@ class AnalyticsService:
     async def get_basic_stats(self) -> dict:
         """Get basic event statistics."""
         # Total events
-        total_result = await self.db.execute(select(func.count(Event.id)))
+        total_result = await self.db.execute(select(func.count(Event.event_id)))
         total_events = total_result.scalar()
         
         # Unique users
@@ -51,19 +51,22 @@ class AnalyticsService:
         """Get top event types by count."""
         query = select(
             Event.event_type,
-            func.count(Event.id).label('count')
+            func.count(Event.event_id).label('count')
         )
         
         # Add date filtering if provided
         if from_date and to_date:
+            # Include the entire end date by adding 1 day and using < instead of <=
+            from datetime import timedelta
+            end_date = to_date + timedelta(days=1)
             query = query.where(
                 and_(
                     Event.occurred_at >= from_date,
-                    Event.occurred_at <= to_date
+                    Event.occurred_at < end_date
                 )
             )
         
-        query = query.group_by(Event.event_type).order_by(func.count(Event.id).desc()).limit(limit)
+        query = query.group_by(Event.event_type).order_by(func.count(Event.event_id).desc()).limit(limit)
         
         result = await self.db.execute(query)
         rows = result.all()
@@ -91,7 +94,7 @@ class AnalyticsService:
         ).where(
             and_(
                 Event.occurred_at >= from_date,
-                Event.occurred_at <= to_date
+                Event.occurred_at < (to_date + timedelta(days=1))
             )
         ).group_by(func.date(Event.occurred_at)).order_by(func.date(Event.occurred_at))
         

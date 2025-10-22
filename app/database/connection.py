@@ -12,14 +12,12 @@ from ..models.database import Base
 
 def get_database_url(async_url: bool = False) -> str:
     """Get database URL, optionally for async connection."""
-    url = settings.DATABASE_URL
-    
     if async_url:
-        # Convert to async URL if needed
-        if url.startswith("postgresql://"):
-            return url.replace("postgresql://", "postgresql+asyncpg://")
-    
-    return url
+        # Already returns the async URL
+        return settings.DATABASE_URL
+    else:
+        # Convert async URL to sync URL for table creation
+        return settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
 
 # Create async engine

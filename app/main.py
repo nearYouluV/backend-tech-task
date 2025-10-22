@@ -11,7 +11,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.v1 import events, stats
+from .api.v1 import events, stats, auth
 from .core.config import settings
 from .core.logging import setup_logging
 
@@ -23,9 +23,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifecycle events for the FastAPI application."""
     # Startup
     setup_logging()
-    # Initialize database asynchronously
-    from .database.connection import init_db
-    await init_db()
+    # Skip database initialization since tables are already created
+    # from .database.connection import init_db
+    # await init_db()
     yield
     # Shutdown
     pass
@@ -52,7 +52,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Health endpoint
+    @app.get("/health")
+    async def health():
+        return {"status": "healthy", "message": "Service is running"}
+
+    @app.get("/api/v1/health") 
+    async def api_health():
+        return {"status": "healthy", "version": "1.0.0", "message": "API is running"}
+
     # Routers
+    app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(events.router, prefix="/api/v1")
     app.include_router(stats.router, prefix="/api/v1")
 

@@ -92,6 +92,8 @@ async def get_top_events(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid date format. Use YYYY-MM-DD"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to get top events", limit=limit, error=str(e))
         raise HTTPException(
@@ -145,6 +147,8 @@ async def get_dau_stats(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid date format. Use YYYY-MM-DD"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to get DAU stats", error=str(e))
         raise HTTPException(
@@ -192,6 +196,8 @@ async def get_retention_stats(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid date format. Use YYYY-MM-DD"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to get retention stats", error=str(e))
         raise HTTPException(

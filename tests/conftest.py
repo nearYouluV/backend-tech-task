@@ -2,19 +2,31 @@
 Test configuration and fixtures.
 """
 
+import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from dotenv import load_dotenv
 
 from app.database.connection import get_db
 from app.main import app
 from app.models.database import Base
 
-# Test database URLs - using PostgreSQL
-SYNC_TEST_DB_URL = "postgresql://events_user:events_password@localhost:5433/events"
-ASYNC_TEST_DB_URL = "postgresql+asyncpg://events_user:events_password@localhost:5433/events"
+# Load environment variables
+load_dotenv()
+
+# Get database configuration from environment
+POSTGRES_USER = os.getenv("POSTGRES_USER", "events_user")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "events_password")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "events")
+
+# Test database URLs - using PostgreSQL from environment variables
+SYNC_TEST_DB_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+ASYNC_TEST_DB_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
 # Sync engine for simple testing
 sync_test_engine = create_engine(SYNC_TEST_DB_URL)

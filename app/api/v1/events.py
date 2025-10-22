@@ -14,6 +14,8 @@ from ...models.schemas import (
     EventsRequest, EventsResponse, ErrorResponse
 )
 from ...services.event_service import EventService
+from ...core.deps import get_current_active_user
+from ...models.database import User
 
 logger = get_logger(__name__)
 
@@ -29,7 +31,8 @@ router = APIRouter(tags=["events"])
 )
 async def ingest_events(
     events_request: EventsRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ) -> EventsResponse:
     """
     Ingest a batch of events.
@@ -46,6 +49,17 @@ async def ingest_events(
             events_count=len(events_request.events)
         )
         
+        # Debug: log first event details
+        if events_request.events:
+            first_event = events_request.events[0]
+            logger.info(
+                "First event details",
+                event_id=str(first_event.event_id),
+                user_id=first_event.user_id,
+                event_type=first_event.event_type,
+                properties_type=type(first_event.properties).__name__
+            )
+        
         responses, created_count, duplicate_count = await event_service.create_events(
             events_request.events
         )
@@ -58,14 +72,20 @@ async def ingest_events(
         )
         
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        
         logger.error(
             "Failed to process events batch",
             error=str(e),
-            events_count=len(events_request.events)
+            events_count=len(events_request.events),
+            traceback=error_trace
         )
+        
+        # Повертаємо детальну інформацію про помилку для діагностики
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to process events"
+            detail=f"Failed to process events: {str(e)}"
         )
 
 

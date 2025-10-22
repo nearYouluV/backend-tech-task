@@ -17,7 +17,7 @@ class EventInput(BaseModel):
             "example": {
                 "event_id": "123e4567-e89b-12d3-a456-426614174000",
                 "occurred_at": "2025-08-21T06:52:34+03:00",
-                "user_id": 1,
+                "user_id": "user-123",
                 "event_type": "view_item",
                 "properties": {
                     "country": "PL",
@@ -32,7 +32,7 @@ class EventInput(BaseModel):
     
     event_id: UUID = Field(..., description="Unique event identifier")
     occurred_at: datetime = Field(..., description="When the event occurred (ISO-8601)")
-    user_id: int = Field(..., description="User identifier", gt=0)
+    user_id: str = Field(..., description="User identifier", min_length=1)
     event_type: str = Field(..., description="Type of event", min_length=1, max_length=100)
     properties: Dict[str, Any] = Field(default_factory=dict, description="Event properties as JSON object")
 
