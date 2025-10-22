@@ -15,7 +15,7 @@ from app.core.auth import (
 )
 from ...core.config import settings
 from ...core.deps import get_current_active_user, get_current_admin_user
-from ...schemas.auth import LoginRequest, Token, UserCreate, UserResponse, RefreshTokenRequest, LogoutRequest
+from ...schemas.auth import LoginRequest, Token, UserCreate, UserSignup, UserResponse, RefreshTokenRequest, LogoutRequest, GrantAdminRequest
 from ...models.database import User
 
 
@@ -24,7 +24,7 @@ router = APIRouter()
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def signup_user(
-    user_data: UserCreate,
+    user_data: UserSignup,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -33,7 +33,8 @@ async def signup_user(
     - **username**: Unique username
     - **email**: User email address  
     - **password**: User password (will be hashed)
-    - **is_admin**: Whether user has admin privileges (defaults to False)
+    
+    Note: All new users are created as regular users (not admins).
     """
     # Check if user already exists
     existing_user = await get_user_by_username(db, user_data.username)
@@ -43,7 +44,7 @@ async def signup_user(
             detail="Username already registered"
         )
     
-    # Create new user (force is_admin to False for public signup)
+    # Create new user (always as regular user)
     user = await create_user(
         db=db,
         username=user_data.username,
@@ -54,39 +55,6 @@ async def signup_user(
     
     return user
 
-
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register_user(
-    user_data: UserCreate,
-    db: AsyncSession = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)  # Only admins can create users
-):
-    """
-    Register a new user (admin only).
-    
-    - **username**: Unique username
-    - **email**: User email address  
-    - **password**: User password (will be hashed)
-    - **is_admin**: Whether user has admin privileges
-    """
-    # Check if user already exists
-    existing_user = await get_user_by_username(db, user_data.username)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
-        )
-    
-    # Create new user
-    user = await create_user(
-        db=db,
-        username=user_data.username,
-        email=user_data.email,
-        password=user_data.password,
-        is_admin=user_data.is_admin
-    )
-    
-    return user
 
 
 @router.post("/login", response_model=Token)
@@ -132,6 +100,41 @@ async def get_current_user_info(
     Requires valid JWT token in Authorization header.
     """
     return current_user
+
+
+@router.post("/grant-admin", response_model=UserResponse)
+async def grant_admin_privileges(
+    grant_request: GrantAdminRequest,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Grant admin privileges to a user (admin only).
+    
+    - **username**: Username of the user to grant admin privileges
+    
+    Only existing admins can grant admin privileges to other users.
+    """
+    # Find the user to grant admin privileges
+    user = await get_user_by_username(db, grant_request.username)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    if user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User already has admin privileges"
+        )
+    
+    # Grant admin privileges
+    user.is_admin = True
+    await db.commit()
+    await db.refresh(user)
+    
+    return user
 
 
 @router.post("/refresh", response_model=Token)

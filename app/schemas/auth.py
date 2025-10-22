@@ -20,6 +20,18 @@ class UserCreate(UserBase):
     password: str
 
 
+class UserSignup(BaseModel):
+    """Schema for public user signup (no admin field)."""
+    username: str
+    email: EmailStr
+    password: str
+
+
+class GrantAdminRequest(BaseModel):
+    """Schema for granting admin privileges."""
+    username: str
+
+
 class UserResponse(UserBase):
     """Schema for user response."""
     id: str
