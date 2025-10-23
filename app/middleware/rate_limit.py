@@ -1,7 +1,3 @@
-"""
-Rate limiting middleware using token bucket algorithm.
-"""
-
 import time
 from collections import defaultdict
 from typing import Dict, Tuple
@@ -53,7 +49,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.buckets: Dict[str, TokenBucket] = defaultdict(
             lambda: TokenBucket(
                 capacity=self.rate_limit_per_minute,
-                refill_rate=self.rate_limit_per_minute / 60.0  # per second
+                refill_rate=self.rate_limit_per_minute / 60.0  
             )
         )
         self.cleanup_interval = 300  # 5 minutes
@@ -61,7 +57,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     
     def _get_client_id(self, request: Request) -> str:
         """Get client identifier for rate limiting."""
-        # Try to get client IP from headers (for proxy setups)
         client_ip = (
             request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or
             request.headers.get("X-Real-IP", "") or
@@ -73,7 +68,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         """Clean up old unused buckets to prevent memory leaks."""
         now = time.time()
         if now - self.last_cleanup > self.cleanup_interval:
-            # Remove buckets that haven't been used in the last hour
             cutoff_time = now - 3600
             to_remove = [
                 client_id for client_id, bucket in self.buckets.items()
@@ -91,14 +85,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         """Process request with rate limiting."""
         
-        # Skip rate limiting for health checks and docs
         if request.url.path in ["/docs", "/redoc", "/openapi.json", "/health"]:
             return await call_next(request)
         
         client_id = self._get_client_id(request)
         bucket = self.buckets[client_id]
         
-        # Check rate limit
         if not bucket.consume():
             logger.warning(
                 "Rate limit exceeded",
@@ -112,15 +104,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 headers={"Retry-After": "60"}
             )
         
-        # Process request
         response = await call_next(request)
         
-        # Add rate limit headers
         response.headers["X-RateLimit-Limit"] = str(self.rate_limit_per_minute)
         response.headers["X-RateLimit-Remaining"] = str(int(bucket.tokens))
         response.headers["X-RateLimit-Reset"] = str(int(time.time() + 60))
         
-        # Periodic cleanup
+    
         self._cleanup_old_buckets()
         
         return response

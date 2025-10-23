@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <!-- Faster startup configuration -->
+    <logger>
+        <level>warning</level>
+        <console>1</console>
+    </logger>
+
+    <!-- Reduce memory usage for faster startup -->
+    <max_server_memory_usage_to_ram_ratio>0.3</max_server_memory_usage_to_ram_ratio>
+    <mlock_executable>false</mlock_executable>
+    
+    <!-- Faster initialization -->
+    <builtin_dictionaries_reload_interval>0</builtin_dictionaries_reload_interval>
+    <dictionaries_lazy_load>false</dictionaries_lazy_load>
+    
+    <!-- Network settings -->
+    <http_port>8123</http_port>
+    <tcp_port>9000</tcp_port>
+    
+    <!-- Faster startup with less strict settings -->
+    <merge_tree>
+        <parts_to_throw_insert>150</parts_to_throw_insert>
+        <parts_to_delay_insert>100</parts_to_delay_insert>
+    </merge_tree>
+</clickhouse>

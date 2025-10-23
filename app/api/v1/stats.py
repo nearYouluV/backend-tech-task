@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...core.logging import get_logger
 from ...database.connection import get_db
 from ...services.analytics_service import AnalyticsService
+from ...core.deps import get_current_admin_user
+from ...models.database import User
 
 logger = get_logger(__name__)
 
@@ -17,10 +19,11 @@ router = APIRouter(tags=["statistics"])
 @router.get(
     "/stats",
     summary="Basic Statistics",
-    description="Get basic event statistics"
+    description="Get basic event statistics (Admin only)"
 )
 async def get_basic_stats(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
 ):
     """
     Get basic event statistics.
@@ -47,13 +50,14 @@ async def get_basic_stats(
 @router.get(
     "/stats/top-events",
     summary="Top Events",
-    description="Get top event types by count"
+    description="Get top event types by count (Admin only)"
 )
 async def get_top_events(
     from_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
     to_date: str = Query(..., description="End date (YYYY-MM-DD)"),
     limit: int = Query(10, ge=1, le=100, description="Number of top events to return"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
 ):
     """
     Get top event types by occurrence count.
@@ -105,12 +109,13 @@ async def get_top_events(
 @router.get(
     "/stats/dau",
     summary="Daily Active Users",
-    description="Get Daily Active Users statistics"
+    description="Get Daily Active Users statistics (Admin only)"
 )
 async def get_dau_stats(
     from_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
     to_date: str = Query(..., description="End date (YYYY-MM-DD)"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
 ):
     """
     Get Daily Active Users statistics.
@@ -160,13 +165,14 @@ async def get_dau_stats(
 @router.get(
     "/stats/retention",
     summary="User Retention",  
-    description="Get user retention statistics"
+    description="Get user retention statistics (Admin only)"
 )
 async def get_retention_stats(
     start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
     windows: int = Query(..., ge=1, le=10, description="Number of retention windows"),
     period_type: str = Query(..., description="Period type (daily, weekly, monthly)"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
 ):
     """
     Get user retention statistics.

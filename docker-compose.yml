@@ -4,19 +4,69 @@ services:
     ports:
       - "${APP_EXTERNAL_PORT:-8000}:8000"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Database connection
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      # JWT Authentication
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      # Application settings
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-1000}
       - DEBUG=${DEBUG:-false}
-      - REDIS_URL=redis://redis:6379/0
+      # ClickHouse connection
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-events_analytics}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
     volumes:
       - ./data:/app/data
+      - ./scripts:/app/scripts
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+      init:
+        condition: service_completed_successfully
     restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  init:
+    build: .
+    environment:
+      # Database connection
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      # JWT Authentication
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      # ClickHouse connection
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-events_analytics}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+    volumes:
+      - ./scripts:/app/scripts
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python scripts/init_all.py
     networks:
       - app-network
 
@@ -28,7 +78,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256
     ports:
-      - "${POSTGRES_EXTERNAL_PORT:-5433}:5432"
+      - "5433:5432"  # Host port 5433 -> Container port 5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
@@ -42,27 +92,41 @@ services:
     networks:
       - app-network
 
-  redis:
-    image: redis:7-alpine
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8-alpine
+    environment:
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-events_analytics}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     ports:
-      - "${REDIS_EXTERNAL_PORT:-6379}:6379"
+      - "8123:8123"  # HTTP interface
+      - "9000:9000"  # Native interface  
     volumes:
-      - redis_data:/data
+      - clickhouse_data:/var/lib/clickhouse
+      - ./init-clickhouse:/docker-entrypoint-initdb.d
+      - ./clickhouse-config/config.xml:/etc/clickhouse-server/config.d/custom.xml
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
     networks:
       - app-network
 
 volumes:
   postgres_data:
     driver: local
-  redis_data:
+    # Persist data even when containers are removed
+  clickhouse_data:
     driver: local
+    # ClickHouse data persistence
 
 networks:
   app-network:

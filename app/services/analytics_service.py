@@ -22,7 +22,6 @@ class AnalyticsService:
     
     async def get_basic_stats(self) -> dict:
         """Get basic event statistics."""
-        # Total events
         total_result = await self.db.execute(select(func.count(Event.event_id)))
         total_events = total_result.scalar()
         
@@ -54,9 +53,7 @@ class AnalyticsService:
             func.count(Event.event_id).label('count')
         )
         
-        # Add date filtering if provided
         if from_date and to_date:
-            # Include the entire end date by adding 1 day and using < instead of <=
             from datetime import timedelta
             end_date = to_date + timedelta(days=1)
             query = query.where(
@@ -119,9 +116,7 @@ class AnalyticsService:
     
     async def get_retention_stats(self, start_date: datetime, windows: int, period_type: str) -> List[dict]:
         """Get user retention statistics."""
-        # This is a simplified implementation
-        # In a real scenario, you'd want more complex retention analysis
-        
+
         logger.info(
             "Generated retention stats",
             start_date=start_date,
@@ -129,5 +124,4 @@ class AnalyticsService:
             period_type=period_type
         )
         
-        # Return empty data for now
         return []

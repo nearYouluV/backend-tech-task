@@ -13,14 +13,11 @@ from ..models.database import Base
 def get_database_url(async_url: bool = False) -> str:
     """Get database URL, optionally for async connection."""
     if async_url:
-        # Already returns the async URL
         return settings.DATABASE_URL
     else:
-        # Convert async URL to sync URL for table creation
         return settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
 
-# Create async engine
 async_engine = create_async_engine(
     get_database_url(async_url=True),
     echo=settings.DEBUG,
@@ -28,7 +25,6 @@ async_engine = create_async_engine(
     pool_recycle=3600
 )
 
-# Create async session factory
 AsyncSessionLocal = async_sessionmaker(
     async_engine,
     class_=AsyncSession,

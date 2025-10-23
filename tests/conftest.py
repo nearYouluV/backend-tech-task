@@ -14,14 +14,14 @@ from app.database.connection import get_db
 from app.main import app
 from app.models.database import Base
 
-# Load environment variables
-load_dotenv()
+# Load test environment variables
+load_dotenv(".env.test")
 
 # Get database configuration from environment
 POSTGRES_USER = os.getenv("POSTGRES_USER", "events_user")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "events_password")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5433")  # Default to test port
 POSTGRES_DB = os.getenv("POSTGRES_DB", "events")
 
 # Test database URLs - using PostgreSQL from environment variables

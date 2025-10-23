@@ -11,7 +11,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.v1 import events, stats, auth
+from .api.v1 import events, stats, auth, cold_storage
 from .core.config import settings
 from .core.logging import setup_logging
 
@@ -23,9 +23,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifecycle events for the FastAPI application."""
     # Startup
     setup_logging()
-    # Skip database initialization since tables are already created
-    # from .database.connection import init_db
-    # await init_db()
+    from .database.connection import init_db
+    await init_db()
     yield
     # Shutdown
     pass
@@ -65,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(events.router, prefix="/api/v1")
     app.include_router(stats.router, prefix="/api/v1")
+    app.include_router(cold_storage.router, prefix="/api/v1/cold-storage", tags=["Cold Storage Analytics"])
 
     return app
 

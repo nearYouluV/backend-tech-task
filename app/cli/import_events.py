@@ -17,7 +17,7 @@ from uuid import UUID
 
 from ..core.config import settings
 from ..core.logging import setup_logging, get_logger
-from ..database.connection import init_sync_db, SessionLocal
+from ..database.connection import get_database_url, AsyncSessionLocal
 from ..models.schemas import EventInput
 from ..services.event_service import EventService
 
@@ -38,7 +38,7 @@ def parse_csv_row(row: dict) -> EventInput:
         return EventInput(
             event_id=UUID(row['event_id']),
             occurred_at=occurred_at,
-            user_id=int(row['user_id']),
+            user_id=str(row['user_id']),  # Convert to string as required by schema
             event_type=row['event_type'],
             properties=properties
         )
@@ -46,15 +46,20 @@ def parse_csv_row(row: dict) -> EventInput:
         raise ValueError(f"Failed to parse row {row}: {e}")
 
 
-def import_events_from_csv(csv_path: Path, batch_size: int = 1000) -> None:
+async def import_events_from_csv(csv_path: Path, batch_size: int = 1000) -> None:
     """Import events from CSV file."""
     
     if not csv_path.exists():
         logger.error(f"CSV file not found: {csv_path}")
         sys.exit(1)
     
-    # Initialize database
-    init_sync_db()
+    # Initialize database tables using sync engine
+    from sqlalchemy import create_engine
+    from ..models.database import Base
+    
+    sync_engine = create_engine(get_database_url(async_url=False))
+    Base.metadata.create_all(bind=sync_engine)
+    sync_engine.dispose()
     
     total_processed = 0
     total_created = 0
@@ -73,7 +78,7 @@ def import_events_from_csv(csv_path: Path, batch_size: int = 1000) -> None:
                 
                 # Process batch when it reaches batch_size
                 if len(batch) >= batch_size:
-                    processed, created, duplicates = process_batch(batch)
+                    processed, created, duplicates = await process_batch_async(batch)
                     total_processed += processed
                     total_created += created
                     total_duplicates += duplicates
@@ -94,7 +99,7 @@ def import_events_from_csv(csv_path: Path, batch_size: int = 1000) -> None:
         
         # Process remaining events in the final batch
         if batch:
-            processed, created, duplicates = process_batch(batch)
+            processed, created, duplicates = await process_batch_async(batch)
             total_processed += processed
             total_created += created
             total_duplicates += duplicates
@@ -107,25 +112,16 @@ def import_events_from_csv(csv_path: Path, batch_size: int = 1000) -> None:
     )
 
 
-def process_batch(events: List[EventInput]) -> tuple[int, int, int]:
-    """Process a batch of events."""
-    db = SessionLocal()
+async def process_batch_async(events: List[EventInput]) -> tuple[int, int, int]:
+    """Process a batch of events asynchronously."""
     try:
-        event_service = EventService(db)
-        
-        # Use asyncio to run the async method
-        import asyncio
-        responses, created_count, duplicate_count = asyncio.run(
-            event_service.create_events(events)
-        )
-        
-        return len(responses), created_count, duplicate_count
-        
+        async with AsyncSessionLocal() as db:
+            event_service = EventService(db)
+            responses, created_count, duplicate_count = await event_service.create_events(events)
+            return len(responses), created_count, duplicate_count
     except Exception as e:
         logger.error(f"Failed to process batch: {e}")
         return 0, 0, 0
-    finally:
-        db.close()
 
 
 def main():
@@ -151,7 +147,8 @@ def main():
     setup_logging()
     
     try:
-        import_events_from_csv(args.csv_path, args.batch_size)
+        import asyncio
+        asyncio.run(import_events_from_csv(args.csv_path, args.batch_size))
     except KeyboardInterrupt:
         logger.info("Import interrupted by user")
         sys.exit(1)
