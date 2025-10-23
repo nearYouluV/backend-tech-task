@@ -229,9 +229,3 @@ CLICKHOUSE_DB=events_analytics
 - **Pytest**: Тестування
 
 Див. `requirements.txt` для повного списку залежностей.
-
----
-
-**Версія**: 1.0.0  
-**Автор**: Backend Tech Task  
-**Ліцензія**: MIT
